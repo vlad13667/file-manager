@@ -14,11 +14,13 @@ import javax.annotation.PostConstruct;
 
 
 import com.example.model.FileData;
+import com.example.exeptions.Exception;
 import org.apache.commons.io.FilenameUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.util.FileSystemUtils;
 
@@ -26,6 +28,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 @Service
 public class FileService implements FileServiceint {
+
 
     @Value("${upload.path}") //вставляет путь из application.properties
     private String uploadPath;
@@ -50,19 +53,19 @@ public class FileService implements FileServiceint {
             }
             Files.copy(file.getInputStream(), root.resolve(file.getOriginalFilename())); //копирование загружаемого файла в директорию
         } catch (Exception e) {
-            throw new RuntimeException("Could not store the file. Error: " + e.getMessage());
+            throw new RuntimeException("Не удалось сохранить файл: " + e.getMessage());
+        } catch (IOException e) {
+            throw new RuntimeException(e);
         }
     }
 
     //Загрузка файла по имени
     public FileData load(String filename) throws IOException {
         Path file;
-        try {
+
             file = Paths.get(uploadPath).resolve(filename);
 
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
+
         return pathToFileData(file);
     }
 
@@ -93,26 +96,24 @@ public class FileService implements FileServiceint {
     private FileData pathToFileData(Path path) throws IOException {
 
         FileData fileData = new FileData();
-        DateFormat dateFormat = new SimpleDateFormat("dd/MM/yyyy - hh:mm:ss");
-        String filename = path.getFileName()
-                .toString();
+
+        String filename = path.getFileName().toString();
+
         Path file = Paths.get(uploadPath).resolve(filename); //сбор пути к файлу
+
         Resource resource = new UrlResource(file.toUri());
+
         fileData.setFileName(filename);
+
         fileData.setFileUrl(String.valueOf(resource.getURL()));
 
-
-
         fileData.setFileType(FilenameUtils.getExtension(filename));
-        BasicFileAttributes attr =
-                Files.readAttributes(path, BasicFileAttributes.class);
+
+        BasicFileAttributes attr = Files.readAttributes(path, BasicFileAttributes.class);
 
         fileData.setUploadDate(String.valueOf(attr.creationTime()));
+
         fileData.setChangeDate(String.valueOf(attr.lastModifiedTime()));
-
-
-
-
         try {
             fileData.setFileSize(Files.size(path));
         } catch (IOException e) {
@@ -122,5 +123,6 @@ public class FileService implements FileServiceint {
 
         return fileData;
     }
+
 
 }

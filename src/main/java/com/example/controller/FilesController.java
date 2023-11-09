@@ -2,6 +2,8 @@ package com.example.controller;
 
 import java.io.IOException;//исключения
 import java.util.List;//коллекция List
+
+import com.example.exeptions.Exception;
 import com.example.model.FileData;
 import com.example.model.UploadResponseMessage;
 import com.example.service.FileService;
@@ -19,7 +21,7 @@ import org.springframework.web.multipart.MultipartFile;//для работы с 
 
 @RestController
 
-public class FilesController {
+public class FilesController  {
     private final FileService fileService;
 
     @Autowired
@@ -30,14 +32,11 @@ public class FilesController {
 
     @PostMapping("/files")
     public ResponseEntity<UploadResponseMessage> uploadFile(@RequestParam("file") MultipartFile file) {
-        try {
+
             fileService.save(file);
             return ResponseEntity.status(HttpStatus.OK)
-                    .body(new UploadResponseMessage("Файл успешно загружен: " + file.getOriginalFilename()));
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.EXPECTATION_FAILED)
-                    .body(new UploadResponseMessage("Не удалось загрузить файл: " + file.getOriginalFilename() + "!"));
-        }
+                    .body(new UploadResponseMessage("Файл успешно загружен: "));
+
     }
 
     @GetMapping ("/files")
@@ -48,20 +47,41 @@ public class FilesController {
     }
 
     @GetMapping ("/files/{filename}")
-    public FileData load (@PathVariable(name = "filename") String filename) throws IOException {
-        final FileData file = fileService.load(filename);
-        return ResponseEntity.status(HttpStatus.OK).body(file).getBody();
+
+    public FileData load (@PathVariable(name = "filename") String filename) throws IOException, Exception {
+       try {
+
+
+           final FileData file = fileService.load(filename);
+           return ResponseEntity.status(HttpStatus.OK).body(file).getBody();
+       }
+       catch (IOException e) {
+           throw new Exception(HttpStatus.BAD_REQUEST, "Данного файла не существует");
+       }
+
+
+
     }
 
     @DeleteMapping ("/files")
-      public void deleteAll() {
+      public ResponseEntity<UploadResponseMessage> deleteAll() {
           fileService.deleteAll();
+       return ResponseEntity.status(HttpStatus.OK).body(new UploadResponseMessage("Все файлы удалены:"));
    }
     @DeleteMapping("/files/{filename}")
-    public  ResponseEntity<?> deleted(@PathVariable(name = "filename") String filename) throws IOException {
-         final boolean deleted = fileService.delete(filename);
-        return deleted
-                ? new ResponseEntity<>(HttpStatus.OK)
-                : new ResponseEntity<>(HttpStatus.NOT_MODIFIED);
+    public Object deleted(@PathVariable(name = "filename") String filename) throws IOException, Exception {
+
+
+    try
+    {
+        fileService.delete(filename);
+        return new ResponseEntity<>(HttpStatus.OK);
+
+    }
+    catch (IOException e)
+    {
+        throw new Exception(HttpStatus.BAD_REQUEST, "Данного файла не существует");
+    }
+
     }
 }
