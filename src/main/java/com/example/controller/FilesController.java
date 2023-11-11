@@ -2,11 +2,11 @@ package com.example.controller;
 
 import java.io.IOException;//исключения
 import java.util.List;//коллекция List
-import java.util.Objects;
 
 
 import com.example.model.FileData;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;//для работы с загружаемыми файлами в Spring
@@ -18,9 +18,11 @@ import com.example.service.FileService;
 public class FilesController  {
 
     @PostMapping("/files")
-    public ResponseEntity<FileData> uploadFile(@RequestParam("file") MultipartFile uploadedFile) throws IOException {
-        FileService.save(uploadedFile);
-        return null;
+    public ResponseEntity<String> uploadFile(@RequestParam("file") MultipartFile uploadedFile) throws IOException {
+        FileData file = FileService.save(uploadedFile);
+
+        return new ResponseEntity<>("Успешная загрузка файла " + file.getFileName(), HttpStatus.CREATED);
+
     }
 
     @GetMapping ("/files")
@@ -31,9 +33,13 @@ public class FilesController  {
 
     @GetMapping ("/files/{fileName}")
 
-    public ResponseEntity<FileData> getFileByName(@PathVariable String fileName) throws IOException {
+    public ResponseEntity<?> getFileByName(@PathVariable String fileName) throws IOException {
+        FileData file = FileService.load(fileName);
 
-        return ResponseEntity.ok(FileService.load(fileName));
+
+        return file != null ?
+                new ResponseEntity(file, HttpStatus.OK)
+                : new ResponseEntity<>("Файл с именем '" + fileName + "' не найден", HttpStatus.NOT_FOUND);
     }
     /*
     @PutMapping("/files/{fileName}")
@@ -59,15 +65,18 @@ public class FilesController  {
 
      */
     @DeleteMapping ("/files")
-    public ResponseEntity<Void> deleteAllFiles() {
+    public ResponseEntity<?> deleteAllFiles() {
         FileService.deleteAll();
-        return ResponseEntity.noContent().build();
+        return new ResponseEntity<>("Все файлы удалены",HttpStatus.OK);
+
     }
     @DeleteMapping("/files/{fileName}")
-    public ResponseEntity<Void> deleteFile(@PathVariable String fileName) throws IOException {
-        FileService.delete(fileName);
+    public ResponseEntity<?> deleteFile(@PathVariable String fileName) throws IOException {
+        boolean isDeleted = FileService.delete(fileName);
 
-        return null;
+        return isDeleted ?
+                new ResponseEntity<>("Файл с именем '" + fileName + "'удалён",HttpStatus.OK)
+                : new ResponseEntity<>("Файл с именем '" + fileName + "'ненайден", HttpStatus.NOT_FOUND);
     }
 
 
