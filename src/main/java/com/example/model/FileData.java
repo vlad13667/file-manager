@@ -1,13 +1,16 @@
 package com.example.model;
 
+import java.util.Date;
+
 public class FileData {
 
     private String fileName;
-    private String uploadDate;
-    private String changeDate;
+    private Date uploadDate;
+    private Date changeDate;
     private String fileType;
     private String fileUrl;
     private Long fileSize;
+    private byte[] fileContent;
     public String getFileType()
     {
         return fileType;
@@ -20,19 +23,19 @@ public class FileData {
     public String getFileName() {
         return fileName;
     }
-    public String getUploadDate()
+    public Date getUploadDate()
     {
         return uploadDate;
     }
-    public void setUploadDate(String uploadDate)
+    public void setUploadDate(Date uploadDate)
     {
         this.uploadDate = uploadDate;
     }
-    public String getChangeDate()
+    public Date getChangeDate()
     {
         return changeDate;
     }
-    public void setChangeDate(String changeDate)
+    public void setChangeDate(Date changeDate)
     {
         this.changeDate = changeDate;
     }
@@ -54,5 +57,12 @@ public class FileData {
 
     public void setFileSize(Long fileSize) {
         this.fileSize = fileSize;
+    }
+    public byte[] getFileContent() {
+        return fileContent;
+    }
+
+    public void setFileContent(byte[] fileContent) {
+        this.fileContent = fileContent;
     }
 }

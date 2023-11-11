@@ -1,33 +1,31 @@
 package com.example.service;
 import java.io.IOException;
-import java.net.MalformedURLException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.attribute.BasicFileAttributes;
-import java.text.DateFormat;
-import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
-import java.util.stream.Collectors;
 
 import javax.annotation.PostConstruct;
+import javax.validation.constraints.Null;
 
 
 import com.example.model.FileData;
-import com.example.exeptions.Exception;
 import org.apache.commons.io.FilenameUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
 
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.util.FileSystemUtils;
 
 import org.springframework.web.multipart.MultipartFile;
 
 @Service
-public class FileService implements FileServiceint {
+public class FileService{
+    private static List<FileData> files = new ArrayList<>();
 
 
     @Value("${upload.path}") //вставляет путь из application.properties
@@ -43,86 +41,78 @@ public class FileService implements FileServiceint {
         }
     }
 
-    // Загрузка нового файла
-    public void save(MultipartFile file) {
-        try {
-            Path root = Paths.get(uploadPath);
-            //проверка существования директории
-            if (!Files.exists(root)) {
-                init();
-            }
-            Files.copy(file.getInputStream(), root.resolve(file.getOriginalFilename())); //копирование загружаемого файла в директорию
-        } catch (Exception e) {
-            throw new RuntimeException("Не удалось сохранить файл: " + e.getMessage());
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+
+    public static FileData save(MultipartFile uploadedFile) throws IOException {
+
+
+
+        FileData file = new FileData();
+        file.setUploadDate(new Date());
+        file.setChangeDate(new Date());
+        file.setFileName(uploadedFile.getOriginalFilename());
+        file.setFileType(uploadedFile.getContentType());
+        file.setFileSize(uploadedFile.getSize());
+        file.setFileContent(uploadedFile.getBytes());
+        files.add(file);
+        return file;
+
     }
 
+
+
+
+
     //Загрузка файла по имени
-    public FileData load(String filename) throws IOException {
-        Path file;
-
-            file = Paths.get(uploadPath).resolve(filename);
-
-
-        return pathToFileData(file);
+    public static FileData load(String fileName) throws IOException {
+        for (FileData file : files) {
+            if (file.getFileName().equals(fileName)) {
+                FileData fileInfo = new  FileData();
+                fileInfo.setUploadDate(file.getUploadDate());
+                fileInfo.setChangeDate(file.getChangeDate());
+                fileInfo.setFileName(file.getFileName());
+                fileInfo.setFileType(file.getFileType());
+                fileInfo.setFileSize(file.getFileSize());
+                fileInfo.setFileContent(file.getFileContent());
+                return fileInfo;
+            }
+        }
+        return null;
     }
 
         // удаление всех файлов
-    public void deleteAll() {
-        FileSystemUtils.deleteRecursively(Paths.get(uploadPath).toFile());//рекурсивное удаление файлов
+    public static void deleteAll() {
+        files.clear();
     }
 
-    public boolean delete(String fileName) throws IOException {
-        Path file = Paths.get(uploadPath).resolve(fileName);
-        Files.delete(file);
-        return true;
-
-    }
-
-
-    public List<FileData> loadAll() throws IOException {
-        Path root = Paths.get(uploadPath);
-        return Files.walk(root, 1).filter(path -> !path.equals(root)).map(path -> {
-            try {
-                return pathToFileData(path);
-            } catch (IOException e) {
-                throw new RuntimeException(e);
+    public static boolean delete(String fileName) throws IOException {
+        FileData foundFile = null;
+        for (FileData file : files) {
+            if (file.getFileName().equals(fileName)) {
+                foundFile = file;
+                break;
             }
-        }).collect(Collectors.toList());
-
-    }
-    private FileData pathToFileData(Path path) throws IOException {
-
-        FileData fileData = new FileData();
-
-        String filename = path.getFileName().toString();
-
-        Path file = Paths.get(uploadPath).resolve(filename); //сбор пути к файлу
-
-        Resource resource = new UrlResource(file.toUri());
-
-        fileData.setFileName(filename);
-
-        fileData.setFileUrl(String.valueOf(resource.getURL()));
-
-        fileData.setFileType(FilenameUtils.getExtension(filename));
-
-        BasicFileAttributes attr = Files.readAttributes(path, BasicFileAttributes.class);
-
-        fileData.setUploadDate(String.valueOf(attr.creationTime()));
-
-        fileData.setChangeDate(String.valueOf(attr.lastModifiedTime()));
-        try {
-            fileData.setFileSize(Files.size(path));
-        } catch (IOException e) {
-            e.printStackTrace();
-            throw new RuntimeException("Error: " + e.getMessage());
         }
-
-        return fileData;
+        if (foundFile != null) {
+            files.remove(foundFile);
+            return true;
+            //return ResponseEntity.noContent().build();
+        }
+        return false;
+       // return ResponseEntity.notFound().build();
     }
+
+
+
+    public static List<String> loadAll() throws IOException {
+        List<String> fileNames = new ArrayList<>();
+        for (FileData file : files) {
+            fileNames.add(file.getFileName());
+        }
+        return(fileNames);
+
+    }
+
+
 
 
 }

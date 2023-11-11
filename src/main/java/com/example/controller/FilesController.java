@@ -2,86 +2,74 @@ package com.example.controller;
 
 import java.io.IOException;//исключения
 import java.util.List;//коллекция List
+import java.util.Objects;
 
-import com.example.exeptions.Exception;
+
 import com.example.model.FileData;
-import com.example.model.UploadResponseMessage;
-import com.example.service.FileService;
-import org.springframework.beans.factory.annotation.Autowired;//внедрение зависимостей spring
-import org.springframework.http.HttpStatus;//статусы http-ответов
+
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.DeleteMapping;//обработка http delete-запроса
-import org.springframework.web.bind.annotation.GetMapping;// обработка HTTP GET-запросов
-import org.springframework.web.bind.annotation.PathVariable;//извлечения переменных из URL в RESTful
-import org.springframework.web.bind.annotation.PostMapping;//обработки HTTP POST-запросов
-import org.springframework.web.bind.annotation.RequestParam;//извлечения параметров запроса из URL
-import org.springframework.web.bind.annotation.RestController;//обрабатывает HTTP-запросы и возвращает данные в формате JSON
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;//для работы с загружаемыми файлами в Spring
 
+import com.example.service.FileService;
 
 @RestController
 
 public class FilesController  {
-    private final FileService fileService;
-
-    @Autowired
-    public FilesController(FileService fileService)
-    {
-        this.fileService = fileService;
-    }
 
     @PostMapping("/files")
-    public ResponseEntity<UploadResponseMessage> uploadFile(@RequestParam("file") MultipartFile file) {
-
-            fileService.save(file);
-            return ResponseEntity.status(HttpStatus.OK)
-                    .body(new UploadResponseMessage("Файл успешно загружен: "));
-
+    public ResponseEntity<FileData> uploadFile(@RequestParam("file") MultipartFile uploadedFile) throws IOException {
+        FileService.save(uploadedFile);
+        return null;
     }
 
     @GetMapping ("/files")
-    public ResponseEntity<List<FileData>> getListFiles() throws IOException {
-        //преобразовываю список файлов в поток где к каждому файлу присваиваеться его информация
-        final List<FileData> FileData = fileService.loadAll();
-        return ResponseEntity.status(HttpStatus.OK).body(FileData);
+    public ResponseEntity<List<String>> getFileNames() throws IOException {
+        List<String> file =  FileService.loadAll();
+        return ResponseEntity.ok(file);
     }
 
-    @GetMapping ("/files/{filename}")
+    @GetMapping ("/files/{fileName}")
 
-    public FileData load (@PathVariable(name = "filename") String filename) throws IOException, Exception {
-       try {
+    public ResponseEntity<FileData> getFileByName(@PathVariable String fileName) throws IOException {
 
-
-           final FileData file = fileService.load(filename);
-           return ResponseEntity.status(HttpStatus.OK).body(file).getBody();
-       }
-       catch (IOException e) {
-           throw new Exception(HttpStatus.BAD_REQUEST, "Данного файла не существует");
-       }
-
-
-
+        return ResponseEntity.ok(FileService.load(fileName));
+    }
+    /*
+    @PutMapping("/files/{fileName}")
+    public ResponseEntity<FileData> updateFile(@PathVariable String fileName, @RequestParam("file") MultipartFile updatedFile) {
+        try {
+            for (FileData file : files) {
+                if (file.getFileName().equals(fileName)) {
+                    file.setModificationDate(new Date());
+                    file.setFileName(updatedFile.getOriginalFilename());
+                    file.setFileType(updatedFile.getContentType());
+                    file.setFileSize(updatedFile.getSize());
+                    file.setFileContent(updatedFile.getBytes());
+                    return ResponseEntity.ok(file);
+                }
+            }
+            return ResponseEntity.notFound().build();
+        } catch (IOException e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
     }
 
+
+     */
     @DeleteMapping ("/files")
-      public ResponseEntity<UploadResponseMessage> deleteAll() {
-          fileService.deleteAll();
-       return ResponseEntity.status(HttpStatus.OK).body(new UploadResponseMessage("Все файлы удалены:"));
-   }
-    @DeleteMapping("/files/{filename}")
-    public Object deleted(@PathVariable(name = "filename") String filename) throws IOException, Exception {
-
-
-    try
-    {
-        fileService.delete(filename);
-        return new ResponseEntity<>(HttpStatus.OK);
-
+    public ResponseEntity<Void> deleteAllFiles() {
+        FileService.deleteAll();
+        return ResponseEntity.noContent().build();
     }
-    catch (IOException e)
-    {
-        throw new Exception(HttpStatus.BAD_REQUEST, "Данного файла не существует");
+    @DeleteMapping("/files/{fileName}")
+    public ResponseEntity<Void> deleteFile(@PathVariable String fileName) throws IOException {
+        FileService.delete(fileName);
+
+        return null;
     }
 
-    }
+
+
 }
