@@ -23,7 +23,9 @@ public class FileService{
 
     public static FileData save(MultipartFile uploadedFile) throws IOException {
 
-
+        if (uploadedFile.getOriginalFilename() == "") {
+            throw new IllegalArgumentException("Файл не указан");
+        }
 
         FileData file = new FileData();
         file.setUploadDate(new Date());
@@ -48,7 +50,7 @@ public class FileService{
                 return file;
             }
         }
-        return null;
+        throw new IllegalArgumentException("File "+ fileName + " not found");
     }
 
         // удаление всех файлов
