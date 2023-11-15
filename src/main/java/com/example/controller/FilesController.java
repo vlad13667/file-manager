@@ -1,104 +1,107 @@
 package com.example.controller;
 
-
-import java.io.IOException;//исключения
-import java.io.InputStream;
-import java.time.LocalDateTime;
-
-import java.util.List;//коллекция List
-
-
-
+import com.example.exeptions.FileInvalidTypeException;
 import com.example.model.FileData;
-
-
+import com.example.service.FileService;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.format.annotation.DateTimeFormat;
-
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;//для работы с загружаемыми файлами в Spring
+import org.springframework.web.multipart.MultipartFile;
 
-import com.example.service.FileService;
+import javax.servlet.http.HttpServletRequest;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.InputStream;
+import java.time.LocalDateTime;
+
+import java.util.List;
 
 @RestController
 
-public class FilesController  {
+public class FilesController {
 
 
+    private final FileService fileService;
 
-    private static final long MAX_FILE_SIZE = 15 * 1024 * 1024; // 15 Мб
+    // С помощью этого конструктора сервис будет автоматически инжектирован Spring'ом
+    public FilesController(FileService fileService) {
+        this.fileService = fileService;
+    }
+
     private static java.util.Arrays Arrays;
-    private static final List<String> ALLOWED_FILE_TYPES = Arrays.asList(
-                // Список разрешенных MIME-типов файлов
-                "application/msword", // .doc
-                "application/vnd.openxmlformats-officedocument.wordprocessingml.document", // .docx
-                "application/vnd.ms-excel", // .xls
-                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", // .xlsx
-                "application/pdf", // .pdf
-                "text/plain", // .txt
-                "application/vnd.ms-powerpoint", // .ppt
-                "application/vnd.openxmlformats-officedocument.presentationml.presentation" // .pptx
-        );
-    @PostMapping("/files")
-    public ResponseEntity<String> uploadFile(@RequestParam("file") MultipartFile uploadedFile) throws IOException {
-        if (uploadedFile.getSize() > MAX_FILE_SIZE) {
-            return new ResponseEntity<>("Ошибка: размер файла превышает 15 Мб", HttpStatus.BAD_REQUEST);
-        }
+    private final List<String> ALLOWED_FILE_TYPES = Arrays.asList(
+            // Список разрешенных MIME-типов файлов
+            "application/msword", // .doc
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document", // .docx
+            "application/vnd.ms-excel", // .xls
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", // .xlsx
+            "application/pdf", // .pdf
+            "text/plain", // .txt
+            "application/vnd.ms-powerpoint", // .ppt
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation" // .pptx
+    );
 
+    @PostMapping("/files")
+    public ResponseEntity<String> uploadFile(HttpServletRequest request, @RequestPart("file") MultipartFile uploadedFile) throws IOException {
         if (!ALLOWED_FILE_TYPES.contains(uploadedFile.getContentType())) {
-            return new ResponseEntity<>("Ошибка: недопустимый тип файла", HttpStatus.BAD_REQUEST);
+            throw new FileInvalidTypeException("Ошибка: недопустимый тип файла");
         }
-        FileData file = FileService.save(uploadedFile);
+        FileData file = fileService.save(uploadedFile);
+
 
         return new ResponseEntity<>("Успешная загрузка файла " + file.getFileName(), HttpStatus.CREATED);
 
     }
 
     @GetMapping("/files/download/multiple")
-    public ResponseEntity<byte[]> downloadMultipleFiles(@RequestParam List<String> fileNames) {
-       FileService.multupla(fileNames);
-        return null;
+    public ResponseEntity<ByteArrayResource> downloadMultipleFiles(@RequestParam List<String> fileNames) {
+        byte[] data = fileService.multupla(fileNames).getBody();
+        ByteArrayResource resource = new ByteArrayResource(data);
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment;filename=files.zip")
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .body(resource);
     }
-    @GetMapping ("/files/{fileName}")
 
-    public ResponseEntity<?> getFileByName(@PathVariable String fileName) throws IOException {
-        FileData file = FileService.load(fileName);
+    @GetMapping("/files/{fileName}")
 
-
-        return file != null ?
-                new ResponseEntity(file, HttpStatus.OK)
-                : new ResponseEntity<>("Файл с именем '" + fileName + "' не найден", HttpStatus.NOT_FOUND);
+    public ResponseEntity<FileData> getFileByName(@PathVariable String fileName) throws IOException {
+        ResponseEntity<FileData> file = fileService.load(fileName);
+        return file;
     }
+
     @GetMapping("/files/download/{fileName}")
     public ResponseEntity<InputStreamResource> downloadFile(@PathVariable String fileName) throws IOException {
-        try {
-            // Эта строка получает  файл как InputStream от  сервиса.
 
-            InputStream file = FileService.download(fileName);
+        // Эта строка получает  файл как InputStream от  сервиса.
 
-            //Устанавливаем contentType файла как MediaType.APPLICATION_OCTET_STREAM, чтобы файл мог быть прямо загружен
-            return ResponseEntity.ok()
-                    .contentType(MediaType.APPLICATION_OCTET_STREAM)
-                    .header("Content-Disposition", "attachment;filename=" + fileName)
-                    .body(new InputStreamResource(file));
-        } catch (IOException e) {
-            e.printStackTrace();
-            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        InputStream file = fileService.download(fileName);
+        //Устанавливаем contentType файла как MediaType.APPLICATION_OCTET_STREAM, чтобы файл мог быть прямо загружен
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .header("Content-Disposition", "attachment;filename=" + fileName)
+                .body(new InputStreamResource(file));
+
+
     }
-    @RequestMapping(value = "/files", method = RequestMethod.GET)
-    public ResponseEntity<List<FileData>> getFileNames(
+
+    @GetMapping("/files")
+    public ResponseEntity<?> getFileNames(
             @RequestParam(required = false) String name,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime dateFrom,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime dateTo,
             @RequestParam(required = false) List<String> types) throws IOException {
 
-        List<FileData> files = FileService.loadAllFiltered(name, dateFrom, dateTo, types);
-        return ResponseEntity.ok(files);
+        return fileService.loadAllFiltered(name, dateFrom, dateTo, types);
+
     }
+
     /*
     @PutMapping("/files/{fileName}")
     public ResponseEntity<FileData> updateFile(@PathVariable String fileName, @RequestParam("file") MultipartFile updatedFile) {
@@ -122,21 +125,23 @@ public class FilesController  {
 
 
      */
-    @DeleteMapping ("/files")
+    @DeleteMapping("/files")
     public ResponseEntity<?> deleteAllFiles() {
-        FileService.deleteAll();
-        return new ResponseEntity<>("Все файлы удалены",HttpStatus.OK);
+        fileService.deleteAll();
+        return new ResponseEntity<>("Все файлы удалены", HttpStatus.OK);
 
     }
+
     @DeleteMapping("/files/{fileName}")
     public ResponseEntity<?> deleteFile(@PathVariable String fileName) throws IOException {
-        boolean isDeleted = FileService.delete(fileName);
+        boolean isDeleted = fileService.delete(fileName);
 
-        return isDeleted ?
-                new ResponseEntity<>("Файл с именем '" + fileName + "'удалён",HttpStatus.OK)
-                : new ResponseEntity<>("Файл с именем '" + fileName + "'ненайден", HttpStatus.NOT_FOUND);
+        if (isDeleted) {
+            return ResponseEntity.ok("Файл с именем '" + fileName + "' удалён.");
+        } else {
+            throw new FileNotFoundException("Файла с именем '" + fileName + "' несуществует.");
+        }
     }
-
 
 
 }

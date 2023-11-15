@@ -1,8 +1,6 @@
 package com.example.service;
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
+
+import java.io.*;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -10,6 +8,9 @@ import java.util.Date;
 import java.util.List;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
+
+import com.example.exeptions.FileCreationException;
+import com.example.exeptions.FileProcessingException;
 import com.example.model.FileData;
 import org.apache.commons.io.IOUtils;
 import org.springframework.http.HttpHeaders;
@@ -19,57 +20,60 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 @Service
-public class FileService{
+public class FileService {
     private static List<FileData> files = new ArrayList<>();
 
 
+    public ResponseEntity<byte[]> multupla(List<String> fileNames) {
+        try {
+            // поток который записывает содержимое файла в байты
+            ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
+            // записывает данные в zip
+            ZipOutputStream zipOutputStream = new ZipOutputStream(byteOutputStream);
+            try {
+
+
+                for (String fileName : fileNames) {
+
+                    InputStream fileStream = FileService.download(fileName);
+
+                    // Создает новый ZipEntry с указанным именем файла и добавляет его в zip-архив.
+                    ZipEntry zipEntry = new ZipEntry(fileName);
+                    zipOutputStream.putNextEntry(zipEntry);
+
+                    // копирования содержимого файла (fileStream) в сжатый zip-поток (zipOutputStream).
+                    IOUtils.copy(fileStream, zipOutputStream);
+                    fileStream.close();
+                    zipOutputStream.closeEntry();
+                }
+            } catch (IOException e) {
+                throw new FileProcessingException("Ошибка обработки файла");
+
+            }
 
 
 
-public static ResponseEntity<byte[]> multupla(List<String> fileNames)
-{
-    try {
-        // поток который записывает содержимое файла в байты
-        ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
-        // записывает данные в zip
-        ZipOutputStream zipOutputStream = new ZipOutputStream(byteOutputStream);
+            zipOutputStream.close();
+            byte[] bytes = byteOutputStream.toByteArray();
+            //Создается новый экземпляр HttpHeaders и добавляет в него заголовок Content-Disposition. Это делает файл доступным для загрузки с именем "files.zip".
+            HttpHeaders headers = new HttpHeaders();
+            headers.add(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=files.zip");
 
-        for (String fileName : fileNames) {
+            return ResponseEntity.ok()
+                    .headers(headers)
+                    .body(bytes);
 
-            InputStream fileStream = FileService.download(fileName);
 
-            // Создает новый ZipEntry с указанным именем файла и добавляет его в zip-архив.
-            ZipEntry zipEntry = new ZipEntry(fileName);
-            zipOutputStream.putNextEntry(zipEntry);
-
-            // копирования содержимого файла (fileStream) в сжатый zip-поток (zipOutputStream).
-            IOUtils.copy(fileStream, zipOutputStream);
-            fileStream.close();
-            zipOutputStream.closeEntry();
+        } catch (IOException e) {
+            throw new FileCreationException("Zip архив не может быть создан");
         }
 
-        zipOutputStream.close();
-        byte[] bytes = byteOutputStream.toByteArray();
-        //Создается новый экземпляр HttpHeaders и добавляет в него заголовок Content-Disposition. Это делает файл доступным для загрузки с именем "files.zip".
-        HttpHeaders headers = new HttpHeaders();
-        headers.add(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=files.zip");
 
-        return ResponseEntity.ok()
-                .headers(headers)
-                .body(bytes);
-
-    } catch (IOException e) {
-        e.printStackTrace();
-        return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
-    }
     }
 
 
-    public static FileData save(MultipartFile uploadedFile) throws IOException {
+    public FileData save(MultipartFile uploadedFile) throws IOException {
 
-        if (uploadedFile.getOriginalFilename() == "") {
-            throw new IllegalArgumentException("Файл не указан");
-        }
 
         FileData file = new FileData();
         file.setUploadDate(new Date());
@@ -78,34 +82,43 @@ public static ResponseEntity<byte[]> multupla(List<String> fileNames)
         file.setFileType(uploadedFile.getContentType());
         file.setFileSize(uploadedFile.getSize());
         file.setFileContent(uploadedFile.getBytes());
-        files.add(file);
-        return file;
-
-    }
 
 
-
-
-
-    //Загрузка файла по имени
-    public static FileData load(String fileName) throws IOException {
-        for (FileData file : files) {
-            if (file.getFileName().equals(fileName)) {
-                return file;
+        FileData oldFile = null;
+        for (FileData f : files) {
+            if (f.getFileName().equals(uploadedFile.getOriginalFilename())) {
+                oldFile = f;
+                break;
             }
         }
-        throw new IllegalArgumentException("Файл "+ fileName + " не найден");
+        if (oldFile != null) {
+            files.remove(oldFile);
+        }
+        files.add(file);
+        return file;
+    }
+    //Загрузка файла по имени
+    public ResponseEntity<FileData> load(String fileName) throws IOException {
+
+        for (FileData file : files) {
+            if (file.getFileName().equals(fileName)) {
+                file.setFileUrl("/files/download/" + file.getFileName());
+
+                return ResponseEntity.status(HttpStatus.OK).body(file);
+            }
+        }
+        throw new FileNotFoundException("Файла с именем '" + fileName + "' не существует.");
     }
 
-        // удаление всех файлов
-    public static void deleteAll() {
+    // удаление всех файлов
+    public void deleteAll() {
 
-            files.clear();
+        files.clear();
 
     }
 
     //удаление файла по имени
-    public static boolean delete(String fileName) throws IOException {
+    public boolean delete(String fileName) throws IOException {
         FileData foundFile = null;
         for (FileData file : files) {
             if (file.getFileName().equals(fileName)) {
@@ -115,15 +128,16 @@ public static ResponseEntity<byte[]> multupla(List<String> fileNames)
         }
         if (foundFile != null) {
             files.remove(foundFile);
-
             return true;
         }
 
-       return false;
+        return false;
     }
 
     //Скачивание файла
-    public static InputStream download(String fileName) throws IOException {
+    public static ByteArrayInputStream download(String fileName) throws FileNotFoundException {
+
+
         FileData foundFile = null;
         for (FileData file : files) {
             if (file.getFileName().equals(fileName)) {
@@ -135,11 +149,13 @@ public static ResponseEntity<byte[]> multupla(List<String> fileNames)
             byte[] fileContent = foundFile.getFileContent();
             return new ByteArrayInputStream(fileContent);
         }
-        throw new IllegalArgumentException("Файл " + fileName + " не найден");
+
+
+        throw new FileNotFoundException("Файла с именем '" + fileName + "' не существует.");
     }
 
 
-    public static List<FileData> loadAllFiltered(String name, LocalDateTime dateFrom, LocalDateTime dateTo, List<String> types) {
+    public ResponseEntity<Object> loadAllFiltered(String name, LocalDateTime dateFrom, LocalDateTime dateTo, List<String> types) throws FileNotFoundException {
         List<FileData> fileDataList = new ArrayList<>();
 
         for (FileData file : files) {
@@ -162,17 +178,16 @@ public static ResponseEntity<byte[]> multupla(List<String> fileNames)
                 fileDataCopy.setFileType(file.getFileType());
                 fileDataCopy.setFileSize(file.getFileSize());
                 fileDataCopy.setFileUrl("/files/download/" + file.getFileName());
-                fileDataCopy.setFileContent(file.getFileContent());
+
 
                 fileDataList.add(fileDataCopy);
             }
         }
 
-        if (fileDataList.isEmpty()){
-            throw new IllegalArgumentException("Ни один файл не соответствует предоставленным фильтрам");
+        if (fileDataList.isEmpty()) {
+            throw new FileNotFoundException("Файла с ведеными фильтрами не найден");
         }
-
-        return fileDataList;
+        return ResponseEntity.ok().body(fileDataList);
     }
 
 
