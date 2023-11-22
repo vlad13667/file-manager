@@ -1,8 +1,10 @@
 package com.example.controller;
 
+
 import com.example.exeptions.FileInvalidTypeException;
 import com.example.model.FileData;
 import com.example.service.FileService;
+import io.swagger.annotations.*;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -12,15 +14,12 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
-
 import javax.servlet.http.HttpServletRequest;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.time.LocalDateTime;
-
 import java.util.List;
-
 @RestController
 
 public class FilesController {
@@ -46,7 +45,9 @@ public class FilesController {
             "application/vnd.openxmlformats-officedocument.presentationml.presentation" // .pptx
     );
 
+    @ApiOperation(value = "Загрузика файла на сервер", response = ResponseEntity.class)
     @PostMapping("/files")
+
     public ResponseEntity<String> uploadFile(HttpServletRequest request, @RequestPart("file") MultipartFile uploadedFile) throws IOException {
         if (!ALLOWED_FILE_TYPES.contains(uploadedFile.getContentType())) {
             throw new FileInvalidTypeException("Ошибка: недопустимый тип файла");
@@ -57,7 +58,8 @@ public class FilesController {
         return new ResponseEntity<>("Успешная загрузка файла " + file.getFileName(), HttpStatus.CREATED);
 
     }
-
+    @ApiOperation(value = "Загрузите несколько файлов в формате zip", response = ResponseEntity.class, notes = "Укажите имена файлов для загрузки их в виде одного zip-файла.")
+    @ApiImplicitParam(name = "fileNames", value = "List of File Names", required = true, dataType = "List", paramType = "query")
     @GetMapping("/files/download/multiple")
     public ResponseEntity<ByteArrayResource> downloadMultipleFiles(@RequestParam List<String> fileNames) {
         byte[] data = fileService.multupla(fileNames).getBody();
@@ -68,6 +70,7 @@ public class FilesController {
                 .contentType(MediaType.APPLICATION_OCTET_STREAM)
                 .body(resource);
     }
+    @ApiOperation(value = "Получить подробную информацию о файле по имени", response = ResponseEntity.class)
 
     @GetMapping("/files/{fileName}")
 
@@ -75,7 +78,7 @@ public class FilesController {
         ResponseEntity<FileData> file = fileService.load(fileName);
         return file;
     }
-
+    @ApiOperation(value = "Загрузить файла", response = ResponseEntity.class, notes = "Укажите имя файла для загрузки файла.")
     @GetMapping("/files/download/{fileName}")
     public ResponseEntity<InputStreamResource> downloadFile(@PathVariable String fileName) throws IOException {
 
@@ -91,6 +94,7 @@ public class FilesController {
 
     }
 
+    @ApiOperation(value = "Получение списка  файлов с помощью фильтров", response = ResponseEntity.class, notes = "Могут быть применены дополнительные фильтры.")
     @GetMapping("/files")
     public ResponseEntity<?> getFileNames(
             @RequestParam(required = false) String name,
@@ -125,6 +129,7 @@ public class FilesController {
 
 
      */
+    @ApiOperation(value = "Удаление всех файлов с сервера", response = ResponseEntity.class)
     @DeleteMapping("/files")
     public ResponseEntity<?> deleteAllFiles() {
         fileService.deleteAll();
@@ -132,6 +137,7 @@ public class FilesController {
 
     }
 
+    @ApiOperation(value = "Удаление файла по имени с сервера", response = ResponseEntity.class, notes = "Укажите имя файла, чтобы удалить файл..")
     @DeleteMapping("/files/{fileName}")
     public ResponseEntity<?> deleteFile(@PathVariable String fileName) throws IOException {
         boolean isDeleted = fileService.delete(fileName);

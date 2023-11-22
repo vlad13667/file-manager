@@ -19,7 +19,12 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiOperation;
+import io.swagger.annotations.ApiParam;
+
 @Service
+@Api(value = "FileService", description = "Сервис для работы с файлами")
 public class FileService {
     private static List<FileData> files = new ArrayList<>();
 
@@ -72,7 +77,7 @@ public class FileService {
     }
 
 
-    public FileData save(MultipartFile uploadedFile) throws IOException {
+    public FileData save(@ApiParam(value = "Файл для сохранения") MultipartFile uploadedFile) throws IOException {
 
 
         FileData file = new FileData();
@@ -98,6 +103,7 @@ public class FileService {
         return file;
     }
     //Загрузка файла по имени
+    @ApiOperation(value = "Загрузить файл", response = FileData.class)
     public ResponseEntity<FileData> load(String fileName) throws IOException {
 
         for (FileData file : files) {
@@ -111,6 +117,7 @@ public class FileService {
     }
 
     // удаление всех файлов
+    @ApiOperation(value = "Удалить все файлы")
     public void deleteAll() {
 
         files.clear();
