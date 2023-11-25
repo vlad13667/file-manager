@@ -1,13 +1,19 @@
 package com.example.model;
 
 import java.util.Date;
+import javax.persistence.*;
 
+@Entity
 public class FileData {
-
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Integer id;
     private String fileName;
-    private Date uploadDate;
-    private Date changeDate;
     private String fileType;
+    @Lob
+    private String uploadDate;
+    private String changeDate;
+
     private String fileUrl;
     private Long fileSize;
     private byte[] fileContent;
@@ -23,19 +29,19 @@ public class FileData {
     public String getFileName() {
         return fileName;
     }
-    public Date getUploadDate()
+    public String getUploadDate()
     {
         return uploadDate;
     }
-    public void setUploadDate(Date uploadDate)
+    public void setUploadDate(String uploadDate)
     {
         this.uploadDate = uploadDate;
     }
-    public Date getChangeDate()
+    public String getChangeDate()
     {
         return changeDate;
     }
-    public void setChangeDate(Date changeDate)
+    public void setChangeDate(String changeDate)
     {
         this.changeDate = changeDate;
     }
