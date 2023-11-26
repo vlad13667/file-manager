@@ -1,6 +1,5 @@
 package com.example.model;
 
-import java.util.Date;
 import javax.persistence.*;
 
 @Entity
@@ -8,15 +7,28 @@ public class FileData {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
+
+    @Column(name = "file_name")
     private String fileName;
+
+    @Column(name = "file_type")
     private String fileType;
-    @Lob
+
+    @Column(name = "upload_date")
     private String uploadDate;
+
+    @Column(name = "change_date")
     private String changeDate;
 
+    @Column(name = "file_url")
     private String fileUrl;
+
+    @Column(name = "file_size")
     private Long fileSize;
+
+    @Column(name = "file_content")
     private byte[] fileContent;
+
     public String getFileType()
     {
         return fileType;

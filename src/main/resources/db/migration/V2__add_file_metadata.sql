@@ -1,0 +1,4 @@
+ALTER TABLE file_data
+ADD COLUMN file_type VARCHAR(255),
+ADD COLUMN upload_date VARCHAR(255),
+ADD COLUMN change_date VARCHAR(255);

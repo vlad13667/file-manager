@@ -14,6 +14,7 @@ import com.example.model.FileData;
 import com.example.model.FileDataRepository;
 import org.apache.commons.io.IOUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -81,13 +82,15 @@ public class FileService {
     public FileData save(@ApiParam(value = "Файл для сохранения") MultipartFile uploadedFile) throws IOException {
 
         LocalDateTime currentDateTime = LocalDateTime.now();
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-        ;
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
         FileData file = new FileData();
         file.setUploadDate(currentDateTime.format(formatter));
         file.setChangeDate(currentDateTime.format(formatter));
-        file.setFileName(uploadedFile.getOriginalFilename());
-        file.setFileType(uploadedFile.getContentType());
+        String[] words = file.getFileName().split("\\.");
+        file.setFileType(words[1]);
+        file.setFileName(words[0]);
+
+        file.setFileUrl("/files/download/" + file.getFileName());
         file.setFileSize(uploadedFile.getSize());
         file.setFileContent(uploadedFile.getBytes());
 
@@ -105,7 +108,7 @@ public class FileService {
 
         FileData file = fileDataRepository.findByFileName(fileName);
         if (file != null) {
-            file.setFileUrl("/files/download/" + file.getFileName());
+
             return ResponseEntity.status(HttpStatus.OK).body(file);
         }
         throw new FileNotFoundException("Файла с именем '" + fileName + "' не существует.");
@@ -133,7 +136,7 @@ public class FileService {
     public ByteArrayInputStream download(String fileName) throws FileNotFoundException {
 
 
-         FileData foundFile = fileDataRepository.findByFileName(fileName);
+        FileData foundFile = fileDataRepository.findByFileName(fileName);
         if (foundFile != null) {
             byte[] fileContent = foundFile.getFileContent();
             return new ByteArrayInputStream(fileContent);
@@ -147,27 +150,22 @@ public class FileService {
 
 
     public ResponseEntity<Object> loadAllFiltered(String name, LocalDateTime dateFrom, LocalDateTime dateTo, List<String> types) throws FileNotFoundException {
-       /* List<FileData> fileDataList = new ArrayList<>();
-        List<FileData> allFiles = fileDataRepository.findAll();
+        Specification<FileData> spec = Specification.where(null);
 
-        for (FileData file : allFiles) {
-            boolean matchesName = name == null || file.getFileName().contains(name);
-            LocalDateTime uploadDate = file.getUploadDate().toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime();
-            boolean matchesDate = (dateFrom == null || uploadDate.isAfter(dateFrom) || uploadDate.isEqual(dateFrom))
-                    && (dateTo == null || !uploadDate.isAfter(dateTo));
-            boolean matchesType = types == null || types.contains(file.getFileType());
-
-            if (matchesName && matchesDate && matchesType) {
-                FileData fileDataCopy = new FileData();
-                fileDataCopy.setUploadDate(file.getUploadDate());
-                fileDataCopy.setChangeDate(file.getChangeDate());
-                fileDataCopy.setFileName(file.getFileName());
-                fileDataCopy.setFileType(file.getFileType());
-                fileDataCopy.setFileSize(file.getFileSize());
-                fileDataCopy.setFileUrl("/files/download/" + file.getFileName());
-                fileDataList.add(fileDataCopy);
-            }
+        if (name != null && !name.isEmpty()) {
+            spec = spec.and(fileDataHasName(name));
         }
+        if (dateFrom != null) {
+            spec = spec.and(fileDataHasDateFrom(dateFrom));
+        }
+        if (dateTo != null) {
+            spec = spec.and(fileDataHasDateTo(dateTo));
+        }
+        if (types != null && !types.isEmpty()) {
+            spec = spec.and(fileDataHasTypes(types));
+        }
+
+        List<FileData> fileDataList = fileDataRepository.findAll(spec);
 
         if (fileDataList.isEmpty()) {
             throw new FileNotFoundException("Файла с введенными фильтрами не найден");
@@ -175,7 +173,20 @@ public class FileService {
         return ResponseEntity.ok().body(fileDataList);
     }
 
-        */
-        return null;
+    private Specification<FileData> fileDataHasName(String name) {
+        return (root, query, cb) -> cb.like(root.get("fileName"), "%" + name + "%");
     }
+
+    private Specification<FileData> fileDataHasDateFrom(LocalDateTime dateFrom) {
+        return (root, query, cb) -> cb.greaterThanOrEqualTo(root.get("uploadDate").as(LocalDateTime.class), dateFrom);
+    }
+
+    private Specification<FileData> fileDataHasDateTo(LocalDateTime dateTo) {
+        return (root, query, cb) -> cb.lessThanOrEqualTo(root.get("uploadDate").as(LocalDateTime.class), dateTo);
+    }
+
+    private Specification<FileData> fileDataHasTypes(List<String> types) {
+        return (root, query, cb) -> root.get("fileType").in(types);
+    }
+
 }
